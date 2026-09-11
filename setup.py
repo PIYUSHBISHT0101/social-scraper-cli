@@ -4,7 +4,7 @@ setup(
     name="social-scraper-cli",
     version="1.0.0",
     description="Universal Terminal CLI Scraper for YouTube, Reddit, and Instagram",
-    author="Piyush",
+    author="Piyush Bisht",
     packages=find_packages(),
     install_requires=[
         "rich>=13.0.0",
@@ -15,6 +15,7 @@ setup(
         "pyyaml>=6.0.0",
         "emoji>=2.10.0",
         "youtube-comment-downloader>=0.1.75",
+        "praw>=7.7.0",
         "instagrapi>=2.1.0",
         "python-dotenv>=1.0.0",
     ],

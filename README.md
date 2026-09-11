@@ -32,7 +32,7 @@
 ## 📦 Project Architecture
 
 ```text
-social_data_studio/
+social-scraper-cli/
 ├── src/
 │   ├── cli.py                     # Rich terminal CLI & Interactive Wizard
 │   ├── core/
