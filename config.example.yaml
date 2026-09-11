@@ -1,0 +1,40 @@
+# Universal Social Scraper CLI Configuration Example
+
+platforms:
+  - youtube
+  - reddit
+
+targets:
+  youtube:
+    - "@CarryMinati"
+    - "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+  reddit:
+    - "r/technology"
+    - "r/india"
+  instagram:
+    - "cockroachjantaparty"
+
+limit: 500
+
+# Flexible Filtering Engine
+filter:
+  emoji_mode: "ALL"               # ALL, WITH_EMOJI, WITHOUT_EMOJI, EMOJI_ONLY
+  only_questions: false          # true = only extract comments with '?'
+  min_likes: 0                   # minimum engagement threshold
+  keywords_include:              # comments must contain one of these (leave empty for none)
+    # - "review"
+    # - "best"
+  keywords_exclude:              # negative keywords (filter out spam/unwanted words)
+    - "dm to promote"
+    - "free crypto"
+    - "telegram"
+
+export_formats:
+  - xlsx
+  - csv
+  - jsonl
+
+output_dir: "data/exports"
+
+# Instagram Session Token (Optional, only needed for private/rate-limited Instagram extraction)
+# instagram_session_id: "YOUR_SESSION_ID_HERE"
