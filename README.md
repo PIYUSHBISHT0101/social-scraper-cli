@@ -118,12 +118,19 @@ python run.py -p youtube -t "https://www.youtube.com/watch?v=VIDEO_ID" -l 200 -o
 ```
 
 #### Scrape Reddit:
+> **Note**: Reddit requires API credentials for reliable access. Get free API keys at [reddit.com/prefs/apps](https://www.reddit.com/prefs/apps) (create a "script" type app).
+
 ```bash
-# Scrape 300 comments from r/technology, filtering only for questions (?):
-python run.py -p reddit -t "r/technology" -l 300 --only-questions -o xlsx,jsonl
+# Scrape 300 comments from r/technology using API credentials:
+python run.py -p reddit -t "r/technology" -l 300 --reddit-client-id "YOUR_ID" --reddit-client-secret "YOUR_SECRET" -o xlsx,jsonl
 
 # Scrape multiple subreddits simultaneously:
-python run.py -p reddit -t "r/india,r/pcmasterrace" -l 500 -o csv,xlsx
+python run.py -p reddit -t "r/india,r/pcmasterrace" -l 500 --reddit-client-id "YOUR_ID" --reddit-client-secret "YOUR_SECRET" -o csv,xlsx
+
+# Or set environment variables and skip the flags:
+# set REDDIT_CLIENT_ID=your_client_id
+# set REDDIT_CLIENT_SECRET=your_client_secret
+python run.py -p reddit -t "r/technology" -l 300 -o xlsx
 ```
 
 #### Scrape Instagram:

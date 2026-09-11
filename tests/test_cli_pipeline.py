@@ -152,9 +152,11 @@ def test_statistics_and_export(tmp_path):
 
 def test_scrapers_normalization():
     yt = YouTubeScraper()
-    c_yt = yt.normalize_comment("yt_1", "YouTube", "@Test", "v1", "url", "Great!")
+    c_yt = yt.normalize_comment("yt_1", "YouTube", "@Test", "v1", "url", "Great!", like_count="1,500", reply_count="250")
     assert c_yt["platform"] == "YouTube"
     assert c_yt["comment"] == "Great!"
+    assert c_yt["like_count"] == 1500
+    assert c_yt["reply_count"] == 250
 
     rd = RedditScraper()
     c_rd = rd.normalize_comment("rd_1", "Reddit", "r/test", "p1", "url", "Nice!")
@@ -163,3 +165,55 @@ def test_scrapers_normalization():
     ig = InstagramScraper()
     c_ig = ig.normalize_comment("ig_1", "Instagram", "@test", "m1", "url", "Cool!")
     assert c_ig["platform"] == "Instagram"
+
+
+def test_youtube_target_identification():
+    yt = YouTubeScraper()
+    # Video URLs
+    assert yt.extract_video_id("https://www.youtube.com/watch?v=jNQXAC9IVRw") == "jNQXAC9IVRw"
+    assert yt.extract_video_id("https://youtu.be/jNQXAC9IVRw") == "jNQXAC9IVRw"
+    assert yt.extract_video_id("https://www.youtube.com/shorts/jNQXAC9IVRw") == "jNQXAC9IVRw"
+    assert yt.extract_video_id("jNQXAC9IVRw") == "jNQXAC9IVRw"
+    # Channel URLs and handles should NOT be extracted as video IDs
+    assert yt.extract_video_id("https://www.youtube.com/@CarryMinati") is None
+    assert yt.extract_video_id("https://www.youtube.com/channel/UC-lHJZR3Gqxm24_Vd_AJ5Yw") is None
+    assert yt.extract_video_id("@CarryMinati") is None
+
+
+def test_filter_engine_type_resilience():
+    # None emoji_count should not raise TypeError
+    engine = FilterEngine(FilterConfig(emoji_mode="WITH_EMOJI"))
+    assert engine.evaluate({"comment": "test", "emoji_count": None}) == (False, "no_emoji")
+
+    # None emoji_list in SPECIFIC_EMOJIS mode
+    engine_sp = FilterEngine(FilterConfig(emoji_mode="SPECIFIC_EMOJIS", specific_emojis=["🔥"]))
+    assert engine_sp.evaluate({"comment": "test", "emoji_list": None}) == (False, "missing_specific_emoji")
+
+    # String likes with commas
+    engine_likes = FilterEngine(FilterConfig(min_likes=100))
+    assert engine_likes.evaluate({"comment": "test", "like_count": "50"}) == (False, "insufficient_likes")
+    assert engine_likes.evaluate({"comment": "test", "like_count": "1,200"}) == (True, "passed")
+
+    # None char/word counts fallback to text
+    engine_len = FilterEngine(FilterConfig(min_chars=10))
+    assert engine_len.evaluate({"comment": "short", "char_count": None}) == (False, "too_short_chars")
+    assert engine_len.evaluate({"comment": "this is long enough", "char_count": None}) == (True, "passed")
+
+
+def test_statistics_type_resilience():
+    stats_calc = DatasetStatistics()
+    comments = [
+        {"comment": "one", "emoji_count": None, "emoji_list": None, "is_question": None, "has_url": None},
+        {"comment": "two 🔥", "emoji_count": 1, "emoji_list": ["🔥"], "is_question": True, "has_url": False, "platform": "YouTube", "source_name": "@Creator"}
+    ]
+    summary = stats_calc.calculate_summary(comments)
+    assert summary["total_final_comments"] == 2
+    assert summary["total_comments_with_emojis"] == 1
+
+    freq = stats_calc.calculate_emoji_frequency(comments)
+    assert len(freq) == 1
+    assert freq[0]["emoji"] == "🔥"
+
+    breakdown = stats_calc.calculate_source_breakdown(comments)
+    assert len(breakdown) == 2
+

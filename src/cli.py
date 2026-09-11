@@ -74,6 +74,8 @@ def run_pipeline(
     instagram_password: Optional[str] = None,
     reddit_username: Optional[str] = None,
     reddit_password: Optional[str] = None,
+    reddit_client_id: Optional[str] = None,
+    reddit_client_secret: Optional[str] = None,
     output_filename: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Execute scraping, enrichment, filtering, deduplication, and export."""
@@ -86,7 +88,12 @@ def run_pipeline(
     if "youtube" in platforms:
         scrapers["youtube"] = YouTubeScraper()
     if "reddit" in platforms:
-        scrapers["reddit"] = RedditScraper(username=reddit_username, password=reddit_password)
+        scrapers["reddit"] = RedditScraper(
+            username=reddit_username,
+            password=reddit_password,
+            client_id=reddit_client_id,
+            client_secret=reddit_client_secret,
+        )
     if "instagram" in platforms:
         scrapers["instagram"] = InstagramScraper(
             session_id=instagram_session_id,
@@ -110,8 +117,8 @@ def run_pipeline(
 
             task_id = progress.add_task(f"[cyan]{plat.capitalize()}[/cyan] ({len(t_list)} targets)", total=len(t_list) * limit_per_target)
 
-            def progress_cb(name, current, total):
-                progress.update(task_id, description=f"[cyan]{plat.capitalize()}[/cyan] -> [yellow]{name}[/yellow]")
+            def progress_cb(name, current, total, _plat=plat, _tid=task_id):
+                progress.update(_tid, description=f"[cyan]{_plat.capitalize()}[/cyan] -> [yellow]{name}[/yellow]")
 
             comments = scraper.scrape(t_list, limit_per_target=limit_per_target, progress_callback=progress_cb)
             raw_comments.extend(comments)
@@ -337,48 +344,102 @@ def run_interactive_wizard():
                 break
 
     # 2B. Reddit Authentication
+    reddit_client_id = None
+    reddit_client_secret = None
+
     if "reddit" in platforms:
         console.print("\n[bold orange3]🤖 Reddit Authentication Setup:[/bold orange3]")
-        console.print("  [1] Authenticated Account (Username & Password)")
-        console.print("  [2] Anonymous / Public Web Mode (No login required - High Speed)")
+        console.print("[dim]Note: Reddit requires API credentials for reliable access.[/dim]")
+        console.print("[dim]Get free API keys at: https://www.reddit.com/prefs/apps (create a 'script' app)[/dim]\n")
+        console.print("  [1] Reddit API Credentials (Recommended - client_id + client_secret)")
+        console.print("  [2] Full Account Login (Username + Password + API Keys)")
+        console.print("  [3] Anonymous / Public Mode (May not work - Reddit blocks unauthenticated access)")
 
-        rd_auth_choice = Prompt.ask("Select Reddit login mode", choices=["1", "2"], default="2")
+        rd_auth_choice = Prompt.ask("Select Reddit login mode", choices=["1", "2", "3"], default="1")
         rd_verified = False
 
         while not rd_verified:
             if rd_auth_choice == "1":
-                reddit_username = Prompt.ask("Reddit Username (e.g. my_reddit_user)")
-                reddit_password = Prompt.ask("Reddit Password", password=True)
+                reddit_client_id = Prompt.ask("Reddit API Client ID (from reddit.com/prefs/apps)")
+                reddit_client_secret = Prompt.ask("Reddit API Client Secret", password=True)
 
-                if not reddit_username.strip() or not reddit_password.strip():
-                    console.print("[bold red]✗ Error: Both Reddit username and password must be provided.[/bold red]")
+                if not reddit_client_id.strip() or not reddit_client_secret.strip():
+                    console.print("[bold red]✗ Error: Both Client ID and Client Secret must be provided.[/bold red]")
                 else:
-                    with console.status("[bold blue]Verifying Reddit credentials...[/bold blue]"):
-                        temp_rd = RedditScraper()
-                        success, msg = temp_rd.authenticate(reddit_username, reddit_password)
-                        if success:
-                            console.print(f"[bold green]✓ {msg}![/bold green]")
+                    with console.status("[bold blue]Verifying Reddit API credentials...[/bold blue]"):
+                        temp_rd = RedditScraper(client_id=reddit_client_id.strip(), client_secret=reddit_client_secret.strip())
+                        if temp_rd._praw_available:
+                            console.print("[bold green]✓ Reddit API credentials verified! PRAW connected in read-only mode.[/bold green]")
                             rd_verified = True
                             break
                         else:
-                            console.print(f"[bold red]✗ {msg}[/bold red]")
+                            console.print("[bold red]✗ Could not connect to Reddit API. Check your Client ID and Secret.[/bold red]")
 
-                console.print("\n[bold yellow]Reddit verification failed.[/bold yellow]")
-                console.print("  [1] Try entering credentials again")
-                console.print("  [2] Switch to Public Web Mode (No login needed)")
-                console.print("  [3] Exit Scraper")
-                action = Prompt.ask("Choose action", choices=["1", "2", "3"], default="2")
+                console.print("\n[bold yellow]Reddit API verification failed.[/bold yellow]")
+                console.print("  [1] Try entering API credentials again")
+                console.print("  [2] Switch to Full Account Login")
+                console.print("  [3] Continue in Public Mode (may not work)")
+                console.print("  [4] Exit Scraper")
+                action = Prompt.ask("Choose action", choices=["1", "2", "3", "4"], default="1")
                 if action == "2":
                     rd_auth_choice = "2"
                 elif action == "3":
-                    console.print("[bold red]Scraper terminated: Valid Reddit credentials required.[/bold red]")
+                    rd_auth_choice = "3"
+                elif action == "4":
+                    console.print("[bold red]Scraper terminated.[/bold red]")
                     sys.exit(0)
-            else:
-                console.print("[bold green]✓ Public Web Mode active (No login or API keys needed)![/bold green]")
-                reddit_username = None
-                reddit_password = None
-                rd_verified = True
-                break
+
+            elif rd_auth_choice == "2":
+                reddit_client_id = Prompt.ask("Reddit API Client ID")
+                reddit_client_secret = Prompt.ask("Reddit API Client Secret", password=True)
+                reddit_username = Prompt.ask("Reddit Username (e.g. my_reddit_user)")
+                reddit_password = Prompt.ask("Reddit Password", password=True)
+
+                if not reddit_client_id.strip() or not reddit_client_secret.strip():
+                    console.print("[bold red]✗ Error: Client ID and Client Secret are required.[/bold red]")
+                elif not reddit_username.strip() or not reddit_password.strip():
+                    console.print("[bold red]✗ Error: Both Reddit username and password must be provided.[/bold red]")
+                else:
+                    with console.status("[bold blue]Verifying Reddit credentials...[/bold blue]"):
+                        temp_rd = RedditScraper(
+                            username=reddit_username.strip(),
+                            password=reddit_password.strip(),
+                            client_id=reddit_client_id.strip(),
+                            client_secret=reddit_client_secret.strip(),
+                        )
+                        if temp_rd._is_authenticated:
+                            console.print(f"[bold green]✓ Successfully verified as u/{temp_rd.authenticated_user}![/bold green]")
+                            rd_verified = True
+                            break
+                        else:
+                            console.print("[bold red]✗ Reddit authentication failed. Check all four credentials.[/bold red]")
+
+                console.print("\n[bold yellow]Reddit verification failed.[/bold yellow]")
+                console.print("  [1] Try entering credentials again")
+                console.print("  [2] Switch to API-only mode (no username/password)")
+                console.print("  [3] Continue in Public Mode (may not work)")
+                console.print("  [4] Exit Scraper")
+                action = Prompt.ask("Choose action", choices=["1", "2", "3", "4"], default="1")
+                if action == "2":
+                    rd_auth_choice = "1"
+                elif action == "3":
+                    rd_auth_choice = "3"
+                elif action == "4":
+                    console.print("[bold red]Scraper terminated.[/bold red]")
+                    sys.exit(0)
+
+            else:  # Public mode
+                console.print("[bold yellow]⚠ Warning: Reddit has blocked public JSON API access (403 Forbidden).[/bold yellow]")
+                console.print("[dim]Scraping may fail without API credentials. Get free keys at: https://www.reddit.com/prefs/apps[/dim]")
+                if Confirm.ask("Continue anyway in Public Mode?", default=False):
+                    reddit_username = None
+                    reddit_password = None
+                    reddit_client_id = None
+                    reddit_client_secret = None
+                    rd_verified = True
+                    break
+                else:
+                    rd_auth_choice = "1"  # Go back to API credentials
 
     # 2C. YouTube Authentication
     if "youtube" in platforms:
@@ -483,6 +544,8 @@ def run_interactive_wizard():
         instagram_password=ig_password,
         reddit_username=reddit_username,
         reddit_password=reddit_password,
+        reddit_client_id=reddit_client_id,
+        reddit_client_secret=reddit_client_secret,
     )
 
 
@@ -504,6 +567,8 @@ def main():
     parser.add_argument("--ig-pass", help="Instagram password")
     parser.add_argument("--reddit-user", help="Reddit username")
     parser.add_argument("--reddit-pass", help="Reddit password")
+    parser.add_argument("--reddit-client-id", help="Reddit API client_id (from reddit.com/prefs/apps)")
+    parser.add_argument("--reddit-client-secret", help="Reddit API client_secret")
     parser.add_argument("-c", "--config", help="Path to YAML configuration file")
     parser.add_argument("-i", "--interactive", action="store_true", help="Run interactive terminal wizard")
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose debug logging")
@@ -538,6 +603,8 @@ def main():
         ig_pass = cfg.get("instagram_password", args.ig_pass)
         rd_user = cfg.get("reddit_username", args.reddit_user)
         rd_pass = cfg.get("reddit_password", args.reddit_pass)
+        rd_client_id = cfg.get("reddit_client_id", args.reddit_client_id)
+        rd_client_secret = cfg.get("reddit_client_secret", args.reddit_client_secret)
     else:
         if not args.platform or not args.targets:
             console.print("[bold red]Error:[/bold red] --platform and --targets are required in CLI mode, or run with -i for wizard.")
@@ -565,6 +632,8 @@ def main():
         ig_pass = args.ig_pass
         rd_user = args.reddit_user
         rd_pass = args.reddit_pass
+        rd_client_id = args.reddit_client_id
+        rd_client_secret = args.reddit_client_secret
 
     run_pipeline(
         platforms=platforms,
@@ -578,6 +647,8 @@ def main():
         instagram_password=ig_pass,
         reddit_username=rd_user,
         reddit_password=rd_pass,
+        reddit_client_id=rd_client_id,
+        reddit_client_secret=rd_client_secret,
         output_filename=args.output_name,
     )
 

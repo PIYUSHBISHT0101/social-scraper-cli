@@ -54,8 +54,10 @@ class TextAnalyzer:
 
         stripped = text.strip()
         words = stripped.split()
-        is_question = "?" in text or "¿" in text
         has_url = bool(URL_REGEX.search(text))
+        # Strip URLs before question check so URL query parameters don't trigger false positives
+        text_no_urls = URL_REGEX.sub("", text)
+        is_question = "?" in text_no_urls or "¿" in text_no_urls
         hashtags = HASHTAG_REGEX.findall(text)
 
         return {

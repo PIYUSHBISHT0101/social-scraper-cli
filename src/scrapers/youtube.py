@@ -11,7 +11,11 @@ from .base import BaseScraper
 
 logger = logging.getLogger(__name__)
 
-VIDEO_ID_REGEX = re.compile(r"(?:v=|\/)([0-9A-Za-z_-]{11}).*")
+VIDEO_PATTERNS = [
+    re.compile(r"(?:https?://)?(?:www\.|m\.|music\.)?youtube\.com/watch\?(?:[^&]+&)*v=([0-9A-Za-z_-]{11})", re.IGNORECASE),
+    re.compile(r"(?:https?://)?youtu\.be/([0-9A-Za-z_-]{11})", re.IGNORECASE),
+    re.compile(r"(?:https?://)?(?:www\.|m\.)?youtube\.com/(?:shorts|embed|v|live)/([0-9A-Za-z_-]{11})", re.IGNORECASE),
+]
 
 
 class YouTubeScraper(BaseScraper):
@@ -24,13 +28,15 @@ class YouTubeScraper(BaseScraper):
         self.downloader = YoutubeCommentDownloader()
 
     def extract_video_id(self, url_or_id: str) -> Optional[str]:
-        """Extract 11-char YouTube video ID."""
+        """Extract 11-char YouTube video ID from URL or raw ID."""
         clean = url_or_id.strip()
-        if len(clean) == 11 and re.match(r"^[0-9A-Za-z_-]{11}$", clean):
+        for pat in VIDEO_PATTERNS:
+            match = pat.search(clean)
+            if match:
+                return match.group(1)
+        # Raw 11-char ID (must not start with @ or URL prefixes)
+        if not clean.startswith(("@", "http://", "https://")) and len(clean) == 11 and re.match(r"^[0-9A-Za-z_-]{11}$", clean):
             return clean
-        match = VIDEO_ID_REGEX.search(clean)
-        if match:
-            return match.group(1)
         return None
 
     def get_channel_videos(self, channel_identifier: str, max_videos: int = 15) -> List[str]:
@@ -139,9 +145,10 @@ class YouTubeScraper(BaseScraper):
 
             vid_id = self.extract_video_id(clean_target)
             target_comments = []
+            is_explicit_video = bool(any(pat.search(clean_target) for pat in VIDEO_PATTERNS))
 
             if vid_id:
-                # Target is a direct video
+                # Target matches video pattern or raw 11-char ID
                 source_name = f"video_{vid_id}"
                 target_comments = self.scrape_video_comments(
                     vid_id,
@@ -151,12 +158,13 @@ class YouTubeScraper(BaseScraper):
                     already_collected=0,
                     target_total=limit_per_target,
                 )
-            else:
-                # Target is a channel
+
+            # If no comments were found and target was not an explicit video URL, try as a channel!
+            if not target_comments and not is_explicit_video:
                 source_name = clean_target.lstrip("@")
                 video_ids = self.get_channel_videos(clean_target, max_videos=15)
                 if not video_ids:
-                    logger.warning(f"No videos found for YouTube channel: {clean_target}")
+                    logger.warning(f"No videos or comments found for YouTube target: {clean_target}")
                     continue
 
                 comments_per_video = max(50, limit_per_target // len(video_ids) + 20)

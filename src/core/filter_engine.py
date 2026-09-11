@@ -76,9 +76,15 @@ class FilterEngine:
             return False, "empty_text"
 
         # 2. Emoji filter
-        emoji_count = comment.get("emoji_count", 0)
-        emoji_only = comment.get("emoji_only", False)
-        emoji_list = comment.get("emoji_list", [])
+        raw_count = comment.get("emoji_count")
+        try:
+            emoji_count = int(raw_count) if raw_count is not None else 0
+        except (ValueError, TypeError):
+            emoji_count = 0
+
+        emoji_only = bool(comment.get("emoji_only", False))
+        raw_list = comment.get("emoji_list")
+        emoji_list = raw_list if isinstance(raw_list, (list, set, tuple)) else []
 
         if cfg.emoji_mode == "WITH_EMOJI" and emoji_count < 1:
             return False, "no_emoji"
@@ -92,31 +98,46 @@ class FilterEngine:
                 return False, "missing_specific_emoji"
 
         # 3. Question filter
-        is_question = comment.get("is_question", False)
+        is_question = bool(comment.get("is_question", False))
         if cfg.only_questions and not is_question:
             return False, "not_a_question"
 
         # 4. URL filter
-        has_url = comment.get("has_url", False)
+        has_url = bool(comment.get("has_url", False))
         if not cfg.allow_urls and has_url:
             return False, "contains_url"
 
         # 5. Length checks
-        char_count = comment.get("char_count", len(text))
+        raw_chars = comment.get("char_count")
+        try:
+            char_count = int(raw_chars) if raw_chars is not None else len(text)
+        except (ValueError, TypeError):
+            char_count = len(text)
+
         if char_count < cfg.min_chars:
             return False, "too_short_chars"
         if char_count > cfg.max_chars:
             return False, "too_long_chars"
 
-        word_count = comment.get("word_count", len(text.split()))
+        raw_words = comment.get("word_count")
+        try:
+            word_count = int(raw_words) if raw_words is not None else len(text.split())
+        except (ValueError, TypeError):
+            word_count = len(text.split())
+
         if word_count < cfg.min_words:
             return False, "too_short_words"
         if word_count > cfg.max_words:
             return False, "too_long_words"
 
         # 6. Engagement / Likes threshold
-        like_count = comment.get("like_count", comment.get("comment_score", 0)) or 0
-        if isinstance(like_count, (int, float)) and like_count < cfg.min_likes:
+        raw_likes = comment.get("like_count", comment.get("comment_score", 0))
+        try:
+            like_count = int(str(raw_likes or 0).replace(",", "").strip())
+        except (ValueError, TypeError):
+            like_count = 0
+
+        if like_count < cfg.min_likes:
             return False, "insufficient_likes"
 
         # 7. Keyword Inclusion

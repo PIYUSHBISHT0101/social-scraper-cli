@@ -15,14 +15,14 @@ class DatasetStatistics:
 
         meta = meta or {}
         total = len(comments)
-        emoji_counts = [c.get("emoji_count", 0) for c in comments]
+        emoji_counts = [int(c.get("emoji_count") or 0) for c in comments]
         total_emojis = sum(emoji_counts)
-        emoji_comments_count = sum(1 for c in comments if c.get("emoji_count", 0) > 0)
-        emoji_only_count = sum(1 for c in comments if c.get("emoji_only", False))
-        questions_count = sum(1 for c in comments if c.get("is_question", False))
-        urls_count = sum(1 for c in comments if c.get("has_url", False))
+        emoji_comments_count = sum(1 for ec in emoji_counts if ec > 0)
+        emoji_only_count = sum(1 for c in comments if bool(c.get("emoji_only", False)))
+        questions_count = sum(1 for c in comments if bool(c.get("is_question", False)))
+        urls_count = sum(1 for c in comments if bool(c.get("has_url", False)))
 
-        all_emojis = [em for c in comments for em in c.get("emoji_list", [])]
+        all_emojis = [em for c in comments for em in (c.get("emoji_list") or []) if em]
         unique_emojis_count = len(set(all_emojis))
 
         platforms = list(set(c.get("platform", "Unknown") for c in comments))
@@ -45,7 +45,7 @@ class DatasetStatistics:
 
     def calculate_emoji_frequency(self, comments: List[Dict]) -> List[Dict]:
         """Rank emojis by occurrence count and percentage."""
-        all_emojis = [em for c in comments for em in c.get("emoji_list", [])]
+        all_emojis = [em for c in comments for em in (c.get("emoji_list") or []) if em]
         if not all_emojis:
             return []
 
@@ -55,7 +55,7 @@ class DatasetStatistics:
 
         result = []
         for emoji_str, freq in counts.most_common():
-            comment_with_this_emoji = sum(1 for c in comments if emoji_str in c.get("emoji_list", []))
+            comment_with_this_emoji = sum(1 for c in comments if emoji_str in (c.get("emoji_list") or []))
             pct_comments = (comment_with_this_emoji / total_comments * 100) if total_comments else 0.0
             pct_occurrences = (freq / total_occurrences * 100) if total_occurrences else 0.0
             result.append({
@@ -84,7 +84,7 @@ class DatasetStatistics:
         """Group stats by source/channel/subreddit."""
         sources = {}
         for c in comments:
-            src = c.get("source_name", c.get("channel_name", c.get("subreddit", c.get("account", "Unknown"))))
+            src = c.get("source_name", c.get("channel_name", c.get("subreddit", c.get("account", "Unknown")))) or "Unknown"
             if src not in sources:
                 sources[src] = {
                     "source": src,
@@ -95,11 +95,12 @@ class DatasetStatistics:
                     "total_emojis": 0,
                 }
             sources[src]["total_comments"] += 1
-            if c.get("emoji_count", 0) > 0:
+            em_cnt = int(c.get("emoji_count") or 0)
+            if em_cnt > 0:
                 sources[src]["emoji_comments"] += 1
-            if c.get("is_question", False):
+            if bool(c.get("is_question", False)):
                 sources[src]["questions"] += 1
-            sources[src]["total_emojis"] += c.get("emoji_count", 0)
+            sources[src]["total_emojis"] += em_cnt
 
         for s in sources.values():
             s["avg_emojis"] = round(s["total_emojis"] / s["total_comments"], 2) if s["total_comments"] else 0.0

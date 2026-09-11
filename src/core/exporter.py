@@ -227,8 +227,11 @@ class DatasetExporter:
     def export_csv(self, comments: List[Dict[str, Any]], output_path: str) -> str:
         """Export comments to UTF-8 CSV."""
         df = pd.DataFrame(comments)
-        if "emoji_list" in df.columns:
-            df["emoji_list"] = df["emoji_list"].apply(lambda x: " ".join(x) if isinstance(x, list) else str(x))
+        for col in ["emoji_list", "hashtags"]:
+            if col in df.columns:
+                df[col] = df[col].apply(
+                    lambda x: " ".join(x) if isinstance(x, list) else ("" if x is None or (isinstance(x, float) and pd.isna(x)) else str(x))
+                )
         df.to_csv(output_path, index=False, encoding="utf-8-sig")
         logger.info(f"Exported CSV: {output_path}")
         return output_path
@@ -246,8 +249,11 @@ class DatasetExporter:
         try:
             df = pd.DataFrame(comments)
             # Flatten lists/dicts for parquet compatibility if needed
-            if "emoji_list" in df.columns:
-                df["emoji_list"] = df["emoji_list"].apply(lambda x: " ".join(x) if isinstance(x, list) else str(x))
+            for col in ["emoji_list", "hashtags"]:
+                if col in df.columns:
+                    df[col] = df[col].apply(
+                        lambda x: " ".join(x) if isinstance(x, list) else ("" if x is None or (isinstance(x, float) and pd.isna(x)) else str(x))
+                    )
             df.to_parquet(output_path, index=False)
             logger.info(f"Exported Parquet: {output_path}")
             return output_path

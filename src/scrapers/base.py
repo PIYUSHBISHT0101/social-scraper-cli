@@ -46,6 +46,16 @@ class BaseScraper(ABC):
         source_url: str = "",
     ) -> Dict[str, Any]:
         """Produce standardized comment record."""
+        try:
+            parsed_likes = int(str(like_count or 0).replace(",", "").strip())
+        except (ValueError, TypeError):
+            parsed_likes = 0
+
+        try:
+            parsed_replies = int(str(reply_count or 0).replace(",", "").strip())
+        except (ValueError, TypeError):
+            parsed_replies = 0
+
         return {
             "comment_id": str(comment_id),
             "platform": platform,
@@ -55,8 +65,8 @@ class BaseScraper(ABC):
             "comment": comment_text,
             "author": author,
             "author_id": str(author_id),
-            "like_count": int(like_count or 0),
-            "reply_count": int(reply_count or 0),
+            "like_count": parsed_likes,
+            "reply_count": parsed_replies,
             "created_at": str(created_at or ""),
             "source_url": source_url or target_url,
         }
