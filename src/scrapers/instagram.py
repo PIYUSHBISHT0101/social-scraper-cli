@@ -42,7 +42,11 @@ class InstagramScraper(BaseScraper):
 
     def login_with_session_id(self, session_id: str) -> tuple[bool, str]:
         """Authenticate using sessionid cookie and verify account."""
-        self.session_id = session_id.strip()
+        clean_sid = (session_id or "").strip()
+        if not clean_sid:
+            return False, "Session ID cannot be empty."
+
+        self.session_id = clean_sid
         try:
             from instagrapi import Client
             self.ig = Client()
@@ -59,8 +63,11 @@ class InstagramScraper(BaseScraper):
 
     def login_with_credentials(self, username: str, password: str) -> tuple[bool, str]:
         """Authenticate using Instagram username and password."""
-        self.username = username.strip().lstrip("@")
-        self.password = password
+        self.username = (username or "").strip().lstrip("@")
+        self.password = password or ""
+        if not self.username or not self.password:
+            return False, "Both username and password must be provided."
+
         try:
             from instagrapi import Client
             self.ig = Client()

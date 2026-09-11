@@ -256,33 +256,85 @@ def run_interactive_wizard():
         console.print("  [2] Username & Password (Direct Login)")
         console.print("  [3] Skip Authentication (Public Posts Only)")
 
-        ig_auth_choice = Prompt.ask("Select Instagram login method", choices=["1", "2", "3"], default="1")
+        ig_mode = Prompt.ask("Select Instagram login method", choices=["1", "2", "3"], default="1")
+        ig_verified = False
 
-        if ig_auth_choice == "1":
-            ig_session_id = Prompt.ask("Paste your Instagram sessionid cookie")
-            with console.status("[bold blue]Verifying Instagram session cookie...[/bold blue]"):
-                temp_ig = InstagramScraper()
-                success, msg = temp_ig.login_with_session_id(ig_session_id)
-                if success:
-                    console.print(f"[bold green]✓ {msg}![/bold green]")
-                else:
-                    console.print(f"[bold yellow]⚠ Warning: {msg}. Continuing with fallback.[/bold yellow]")
+        while not ig_verified:
+            if ig_mode == "1":
+                ig_session_id = Prompt.ask("Paste your Instagram sessionid cookie (or type 'back')")
+                if ig_session_id.strip().lower() == "back":
+                    ig_mode = Prompt.ask("Select login method [1: Session ID, 2: User/Pass, 3: Public]", choices=["1", "2", "3"], default="1")
+                    continue
 
-        elif ig_auth_choice == "2":
-            ig_username = Prompt.ask("Instagram Username (e.g. your_username)")
-            ig_password = Prompt.ask("Instagram Password", password=True)
-            with console.status("[bold blue]Logging into Instagram...[/bold blue]"):
-                temp_ig = InstagramScraper()
-                success, msg = temp_ig.login_with_credentials(ig_username, ig_password)
-                if success:
-                    console.print(f"[bold green]✓ {msg}![/bold green]")
+                if not ig_session_id.strip():
+                    console.print("[bold red]✗ Error: Session ID cannot be empty.[/bold red]")
+                    success = False
+                    msg = "No session ID entered"
                 else:
-                    console.print(f"[bold red]✗ {msg}.[/bold red]")
-                    retry = Confirm.ask("Would you like to continue anyway?", default=True)
-                    if not retry:
-                        sys.exit(0)
-        else:
-            console.print("[dim]Continuing in unauthenticated public mode.[/dim]")
+                    with console.status("[bold blue]Verifying Instagram session cookie...[/bold blue]"):
+                        temp_ig = InstagramScraper()
+                        success, msg = temp_ig.login_with_session_id(ig_session_id)
+                        if success:
+                            console.print(f"[bold green]✓ {msg}![/bold green]")
+                            ig_verified = True
+                            break
+                        else:
+                            console.print(f"[bold red]✗ {msg}[/bold red]")
+
+                console.print("\n[bold yellow]Authentication failed. Cannot proceed without valid Instagram credentials.[/bold yellow]")
+                console.print("  [1] Try entering Session ID again")
+                console.print("  [2] Switch to Username & Password login")
+                console.print("  [3] Switch to Public Mode (no login)")
+                console.print("  [4] Exit Scraper")
+                action = Prompt.ask("Choose action", choices=["1", "2", "3", "4"], default="1")
+                if action == "2":
+                    ig_mode = "2"
+                elif action == "3":
+                    ig_mode = "3"
+                elif action == "4":
+                    console.print("[bold red]Scraper terminated: Valid Instagram credentials required.[/bold red]")
+                    sys.exit(0)
+
+            elif ig_mode == "2":
+                ig_username = Prompt.ask("Instagram Username (e.g. your_username)")
+                ig_password = Prompt.ask("Instagram Password", password=True)
+
+                if not ig_username.strip() or not ig_password.strip():
+                    console.print("[bold red]✗ Error: Both username and password must be provided.[/bold red]")
+                    success = False
+                    msg = "Missing credentials"
+                else:
+                    with console.status("[bold blue]Logging into Instagram...[/bold blue]"):
+                        temp_ig = InstagramScraper()
+                        success, msg = temp_ig.login_with_credentials(ig_username, ig_password)
+                        if success:
+                            console.print(f"[bold green]✓ {msg}![/bold green]")
+                            ig_verified = True
+                            break
+                        else:
+                            console.print(f"[bold red]✗ {msg}[/bold red]")
+
+                console.print("\n[bold yellow]Login failed. Cannot proceed without valid Instagram credentials.[/bold yellow]")
+                console.print("  [1] Try entering Username & Password again")
+                console.print("  [2] Switch to Browser Session ID Cookie")
+                console.print("  [3] Switch to Public Mode (no login)")
+                console.print("  [4] Exit Scraper")
+                action = Prompt.ask("Choose action", choices=["1", "2", "3", "4"], default="1")
+                if action == "2":
+                    ig_mode = "1"
+                elif action == "3":
+                    ig_mode = "3"
+                elif action == "4":
+                    console.print("[bold red]Scraper terminated: Valid Instagram credentials required.[/bold red]")
+                    sys.exit(0)
+
+            elif ig_mode == "3":
+                console.print("[dim]Continuing in unauthenticated public mode (private/protected comments will not be accessible).[/dim]")
+                ig_session_id = None
+                ig_username = None
+                ig_password = None
+                ig_verified = True
+                break
 
     # 2B. Reddit Authentication
     if "reddit" in platforms:
@@ -291,19 +343,42 @@ def run_interactive_wizard():
         console.print("  [2] Anonymous / Public Web Mode (No login required - High Speed)")
 
         rd_auth_choice = Prompt.ask("Select Reddit login mode", choices=["1", "2"], default="2")
+        rd_verified = False
 
-        if rd_auth_choice == "1":
-            reddit_username = Prompt.ask("Reddit Username (e.g. my_reddit_user)")
-            reddit_password = Prompt.ask("Reddit Password", password=True)
-            with console.status("[bold blue]Verifying Reddit credentials...[/bold blue]"):
-                temp_rd = RedditScraper()
-                success, msg = temp_rd.authenticate(reddit_username, reddit_password)
-                if success:
-                    console.print(f"[bold green]✓ {msg}![/bold green]")
+        while not rd_verified:
+            if rd_auth_choice == "1":
+                reddit_username = Prompt.ask("Reddit Username (e.g. my_reddit_user)")
+                reddit_password = Prompt.ask("Reddit Password", password=True)
+
+                if not reddit_username.strip() or not reddit_password.strip():
+                    console.print("[bold red]✗ Error: Both Reddit username and password must be provided.[/bold red]")
                 else:
-                    console.print(f"[bold yellow]⚠ {msg}. Falling back to public web mode.[/bold yellow]")
-        else:
-            console.print("[bold green]✓ Public Web Mode active (No login or API keys needed)![/bold green]")
+                    with console.status("[bold blue]Verifying Reddit credentials...[/bold blue]"):
+                        temp_rd = RedditScraper()
+                        success, msg = temp_rd.authenticate(reddit_username, reddit_password)
+                        if success:
+                            console.print(f"[bold green]✓ {msg}![/bold green]")
+                            rd_verified = True
+                            break
+                        else:
+                            console.print(f"[bold red]✗ {msg}[/bold red]")
+
+                console.print("\n[bold yellow]Reddit verification failed.[/bold yellow]")
+                console.print("  [1] Try entering credentials again")
+                console.print("  [2] Switch to Public Web Mode (No login needed)")
+                console.print("  [3] Exit Scraper")
+                action = Prompt.ask("Choose action", choices=["1", "2", "3"], default="2")
+                if action == "2":
+                    rd_auth_choice = "2"
+                elif action == "3":
+                    console.print("[bold red]Scraper terminated: Valid Reddit credentials required.[/bold red]")
+                    sys.exit(0)
+            else:
+                console.print("[bold green]✓ Public Web Mode active (No login or API keys needed)![/bold green]")
+                reddit_username = None
+                reddit_password = None
+                rd_verified = True
+                break
 
     # 2C. YouTube Authentication
     if "youtube" in platforms:
