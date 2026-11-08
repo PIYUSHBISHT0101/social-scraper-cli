@@ -37,9 +37,8 @@ export_formats:
 output_dir: "data/exports"
 
 # Instagram Session Token (Optional, only needed for private/rate-limited Instagram extraction)
-# instagram_session_id: "YOUR_SESSION_ID_HERE"
+# Use INSTAGRAM_SESSION_ID / INSTAGRAM_PASSWORD environment variables for secrets.
 # instagram_username: "your_instagram_username"
-# instagram_password: "your_instagram_password"
 
 # Reddit API Credentials (Required for reliable Reddit scraping)
 # Get free API keys at: https://www.reddit.com/prefs/apps
@@ -48,6 +47,5 @@ output_dir: "data/exports"
 # 3. Choose "script" type, give it a name
 # 4. Copy the client_id (under app name) and client_secret
 # reddit_client_id: "YOUR_CLIENT_ID_HERE"
-# reddit_client_secret: "YOUR_CLIENT_SECRET_HERE"
+# Use REDDIT_CLIENT_SECRET / REDDIT_PASSWORD environment variables for secrets.
 # reddit_username: "your_reddit_username"
-# reddit_password: "your_reddit_password"

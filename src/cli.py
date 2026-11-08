@@ -117,12 +117,14 @@ def run_pipeline(
 
             task_id = progress.add_task(f"[cyan]{plat.capitalize()}[/cyan] ({len(t_list)} targets)", total=len(t_list) * limit_per_target)
 
+            target_progress = {}
             def progress_cb(name, current, total, _plat=plat, _tid=task_id):
-                progress.update(_tid, description=f"[cyan]{_plat.capitalize()}[/cyan] -> [yellow]{name}[/yellow]")
+                target_progress[name] = min(max(0, current), limit_per_target)
+                progress.update(_tid, completed=sum(target_progress.values()), description=f"[cyan]{_plat.capitalize()}[/cyan] -> [yellow]{name}[/yellow]")
 
             comments = scraper.scrape(t_list, limit_per_target=limit_per_target, progress_callback=progress_cb)
             raw_comments.extend(comments)
-            progress.update(task_id, completed=len(t_list) * limit_per_target)
+            progress.update(task_id, completed=len(comments), total=len(comments) or 1)
 
     console.print(f"\n[bold green]✓ Scraped {len(raw_comments)} raw comments across {len(platforms)} platform(s)[/bold green]")
 
@@ -148,8 +150,8 @@ def run_pipeline(
     console.print(f"[bold cyan]✓ Filtered:[/bold cyan] Kept [green]{len(filtered)}[/green] / {len(enriched)} (Filtered out {filter_stats['rejected']})")
 
     # Deduplication Phase
-    with console.status("[bold blue]Deduplicating comment IDs and exact text...[/bold blue]"):
-        dedup = Deduplicator(by_comment_id=True, by_exact_text=True)
+    with console.status("[bold blue]Deduplicating comment IDs...[/bold blue]"):
+        dedup = Deduplicator(by_comment_id=True, by_exact_text=False)
         final_comments, dedup_stats = dedup.deduplicate(filtered)
 
     console.print(f"[bold cyan]✓ Deduplicated:[/bold cyan] Kept [green]{len(final_comments)}[/green] clean comments (Purged {dedup_stats['total_removed']} duplicates)")
@@ -268,7 +270,7 @@ def run_interactive_wizard():
 
         while not ig_verified:
             if ig_mode == "1":
-                ig_session_id = Prompt.ask("Paste your Instagram sessionid cookie (or type 'back')")
+                ig_session_id = Prompt.ask("Paste your Instagram sessionid cookie (or type 'back')", password=True)
                 if ig_session_id.strip().lower() == "back":
                     ig_mode = Prompt.ask("Select login method [1: Session ID, 2: User/Pass, 3: Public]", choices=["1", "2", "3"], default="1")
                     continue
@@ -575,6 +577,9 @@ def main():
 
     args = parser.parse_args()
 
+    if any((args.session_id, args.ig_pass, args.reddit_pass, args.reddit_client_secret)):
+        console.print("[yellow]Warning: secrets in command arguments may be visible to other processes or in shell history. Use environment variables instead.[/yellow]")
+
     if args.interactive or len(sys.argv) == 1:
         run_interactive_wizard()
         return
@@ -582,7 +587,9 @@ def main():
     print_banner()
 
     # Load from config YAML if provided
-    if args.config and os.path.exists(args.config):
+    if args.config and not os.path.isfile(args.config):
+        parser.error("configuration file does not exist")
+    if args.config:
         with open(args.config, "r", encoding="utf-8") as f:
             cfg = yaml.safe_load(f)
         platforms = cfg.get("platforms", ["youtube"])
@@ -598,13 +605,15 @@ def main():
         )
         export_formats = cfg.get("export_formats", ["xlsx", "csv", "jsonl"])
         output_dir = cfg.get("output_dir", "data/exports")
-        session_id = cfg.get("instagram_session_id", args.session_id)
+        if any(cfg.get(k) for k in ("instagram_session_id", "instagram_password", "reddit_password", "reddit_client_secret")):
+            console.print("[yellow]Warning: credentials in a configuration file can be accidentally shared; use environment variables.[/yellow]")
+        session_id = cfg.get("instagram_session_id") or args.session_id or os.getenv("INSTAGRAM_SESSION_ID")
         ig_user = cfg.get("instagram_username", args.ig_user)
-        ig_pass = cfg.get("instagram_password", args.ig_pass)
+        ig_pass = cfg.get("instagram_password") or args.ig_pass or os.getenv("INSTAGRAM_PASSWORD")
         rd_user = cfg.get("reddit_username", args.reddit_user)
-        rd_pass = cfg.get("reddit_password", args.reddit_pass)
+        rd_pass = cfg.get("reddit_password") or args.reddit_pass or os.getenv("REDDIT_PASSWORD")
         rd_client_id = cfg.get("reddit_client_id", args.reddit_client_id)
-        rd_client_secret = cfg.get("reddit_client_secret", args.reddit_client_secret)
+        rd_client_secret = cfg.get("reddit_client_secret") or args.reddit_client_secret or os.getenv("REDDIT_CLIENT_SECRET")
     else:
         if not args.platform or not args.targets:
             console.print("[bold red]Error:[/bold red] --platform and --targets are required in CLI mode, or run with -i for wizard.")
@@ -627,13 +636,13 @@ def main():
         )
         export_formats = [f.strip() for f in args.export.split(",") if f.strip()]
         output_dir = args.output_dir
-        session_id = args.session_id
+        session_id = args.session_id or os.getenv("INSTAGRAM_SESSION_ID")
         ig_user = args.ig_user
-        ig_pass = args.ig_pass
+        ig_pass = args.ig_pass or os.getenv("INSTAGRAM_PASSWORD")
         rd_user = args.reddit_user
-        rd_pass = args.reddit_pass
+        rd_pass = args.reddit_pass or os.getenv("REDDIT_PASSWORD")
         rd_client_id = args.reddit_client_id
-        rd_client_secret = args.reddit_client_secret
+        rd_client_secret = args.reddit_client_secret or os.getenv("REDDIT_CLIENT_SECRET")
 
     run_pipeline(
         platforms=platforms,

@@ -18,6 +18,15 @@ VIDEO_PATTERNS = [
 ]
 
 
+def parse_like_count(value) -> int:
+    """Parse display counts such as 1.2K; malformed values default to zero."""
+    match = re.fullmatch(r"\s*([0-9]+(?:\.[0-9]+)?)\s*([kKmMbB]?)\s*", str(value or "").replace(",", ""))
+    if not match:
+        return 0
+    multiplier = {"": 1, "k": 1000, "m": 1000000, "b": 1000000000}[match.group(2).lower()]
+    return int(float(match.group(1)) * multiplier)
+
+
 class YouTubeScraper(BaseScraper):
     """Scrapes YouTube comments from channels and direct video URLs without API keys."""
 
@@ -93,10 +102,7 @@ class YouTubeScraper(BaseScraper):
                 likes = c.get("votes", 0)
                 time_str = c.get("time", "")
 
-                try:
-                    likes_int = int(str(likes).replace(",", "").strip() or 0)
-                except Exception:
-                    likes_int = 0
+                likes_int = parse_like_count(likes)
 
                 normalized = self.normalize_comment(
                     comment_id=cid,
