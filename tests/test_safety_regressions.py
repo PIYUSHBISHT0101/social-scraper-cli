@@ -1,4 +1,5 @@
 """Regression tests for data integrity and safe exports."""
+import csv
 from unittest.mock import patch
 
 import openpyxl
@@ -40,6 +41,14 @@ def test_failed_parquet_is_not_reported(tmp_path):
     exporter = DatasetExporter(str(tmp_path))
     with patch.object(exporter, "export_parquet", return_value=""):
         assert exporter.export_all([{"comment": "test"}], formats=["parquet"]) == {}
+
+
+def test_csv_export_escapes_formulas(tmp_path):
+    path = tmp_path / "comments.csv"
+    DatasetExporter(str(tmp_path)).export_csv([{"comment": "=1+1", "author": "@name"}], str(path))
+    with path.open(encoding="utf-8-sig", newline="") as stream:
+        row = next(csv.DictReader(stream))
+    assert row == {"comment": "'=1+1", "author": "'@name"}
 
 
 def test_abbreviated_likes():
