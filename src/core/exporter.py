@@ -11,6 +11,13 @@ from openpyxl.utils import get_column_letter
 logger = logging.getLogger(__name__)
 
 
+def spreadsheet_safe(value):
+    """Prevent untrusted text from being interpreted as a spreadsheet formula."""
+    if isinstance(value, str) and (value.startswith(("\t", "\r", "\n")) or value.lstrip().startswith(("=", "+", "-", "@"))):
+        return "'" + value
+    return value
+
+
 class DatasetExporter:
     """Exports processed social media datasets to Excel, CSV, JSONL, and Parquet."""
 
@@ -67,8 +74,8 @@ class DatasetExporter:
 
         if "parquet" in formats:
             parquet_path = os.path.join(self.output_dir, f"{base_filename}.parquet")
-            self.export_parquet(comments, parquet_path)
-            generated_files["parquet"] = parquet_path
+            if self.export_parquet(comments, parquet_path):
+                generated_files["parquet"] = parquet_path
 
         return generated_files
 
@@ -220,6 +227,10 @@ class DatasetExporter:
             ws_source.freeze_panes = "A2"
             ws_source.auto_filter.ref = f"A1:F{len(source_stats) + 1}"
 
+        for sheet in wb.worksheets:
+            for row in sheet.iter_rows():
+                for cell in row:
+                    cell.value = spreadsheet_safe(cell.value)
         wb.save(output_path)
         logger.info(f"Successfully exported Excel workbook: {output_path}")
         return output_path
@@ -232,6 +243,7 @@ class DatasetExporter:
                 df[col] = df[col].apply(
                     lambda x: " ".join(x) if isinstance(x, list) else ("" if x is None or (isinstance(x, float) and pd.isna(x)) else str(x))
                 )
+        df = df.map(spreadsheet_safe) if hasattr(df, "map") else df.applymap(spreadsheet_safe)
         df.to_csv(output_path, index=False, encoding="utf-8-sig")
         logger.info(f"Exported CSV: {output_path}")
         return output_path

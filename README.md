@@ -120,23 +120,21 @@ python run.py -p youtube -t "https://www.youtube.com/watch?v=VIDEO_ID" -l 200 -o
 #### Scrape Reddit:
 > **Note**: Reddit requires API credentials for reliable access. Get free API keys at [reddit.com/prefs/apps](https://www.reddit.com/prefs/apps) (create a "script" type app).
 
-```bash
-# Scrape 300 comments from r/technology using API credentials:
-python run.py -p reddit -t "r/technology" -l 300 --reddit-client-id "YOUR_ID" --reddit-client-secret "YOUR_SECRET" -o xlsx,jsonl
+```powershell
+# Set credentials in this PowerShell session (do not commit or share them):
+$env:REDDIT_CLIENT_ID = "YOUR_ID"
+$env:REDDIT_CLIENT_SECRET = "YOUR_SECRET"
+python run.py -p reddit -t "r/technology" -l 300 -o xlsx
 
 # Scrape multiple subreddits simultaneously:
-python run.py -p reddit -t "r/india,r/pcmasterrace" -l 500 --reddit-client-id "YOUR_ID" --reddit-client-secret "YOUR_SECRET" -o csv,xlsx
-
-# Or set environment variables and skip the flags:
-# set REDDIT_CLIENT_ID=your_client_id
-# set REDDIT_CLIENT_SECRET=your_client_secret
-python run.py -p reddit -t "r/technology" -l 300 -o xlsx
+python run.py -p reddit -t "r/india,r/pcmasterrace" -l 500 -o csv,xlsx
 ```
 
 #### Scrape Instagram:
-```bash
+```powershell
 # Scrape comments from an Instagram account with an authenticated session:
-python run.py -p instagram -t "@cockroachjantaparty" -l 500 --session-id "YOUR_SESSION_ID" -o xlsx
+$env:INSTAGRAM_SESSION_ID = "YOUR_SESSION_ID"
+python run.py -p instagram -t "@cockroachjantaparty" -l 500 -o xlsx
 ```
 
 ---
@@ -144,8 +142,10 @@ python run.py -p instagram -t "@cockroachjantaparty" -l 500 --session-id "YOUR_S
 ### 3. Automated Configuration Mode (`config.yaml`)
 You can configure multi-platform batch runs using a YAML configuration file:
 
+Copy `config.example.yaml` to `config.yaml` and edit the copy. `config.yaml` is ignored by Git; keep passwords and tokens in environment variables, not in YAML or command-line arguments. Existing tracked files remain tracked even if they match `.gitignore`. If a secret has already been committed, revoke it and remove it from Git history.
+
 ```bash
-python run.py -c config.example.yaml
+python run.py -c config.yaml
 ```
 
 **`config.yaml` Example:**

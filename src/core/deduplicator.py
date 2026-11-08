@@ -39,28 +39,33 @@ class Deduplicator:
             text = str(c.get("comment", "") or "").strip()
             author = str(c.get("author", "") or "").strip()
 
-            # 1. ID check
+            platform = str(c.get("platform", "") or "").strip().casefold()
+            id_key = (platform, cid)
+            author_key = (platform, author.casefold())
+            # Record keys only after every rejection rule has passed.
             if self.by_comment_id and cid:
-                if cid in seen_ids:
+                if id_key in seen_ids:
                     stats["id_duplicates"] += 1
                     continue
-                seen_ids.add(cid)
 
             # 2. Text check
             if self.by_exact_text and text:
                 if text in seen_texts:
                     stats["text_duplicates"] += 1
                     continue
-                seen_texts.add(text)
 
             # 3. Author frequency limit
             if self.max_comments_per_author is not None and author:
-                curr = author_counts.get(author, 0)
+                curr = author_counts.get(author_key, 0)
                 if curr >= self.max_comments_per_author:
                     stats["author_limit_exceeded"] += 1
                     continue
-                author_counts[author] = curr + 1
-
+            if self.by_comment_id and cid:
+                seen_ids.add(id_key)
+            if self.by_exact_text and text:
+                seen_texts.add(text)
+            if self.max_comments_per_author is not None and author:
+                author_counts[author_key] = author_counts.get(author_key, 0) + 1
             kept.append(c)
 
         stats["total_removed"] = len(comments) - len(kept)

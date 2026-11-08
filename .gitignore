@@ -18,6 +18,10 @@ logs/*
 
 # Environments & Secrets
 .env
+.env.*
+!.env.example
+config.yaml
+config.yml
 .venv/
 venv/
 ENV/
